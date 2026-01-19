@@ -1,5 +1,7 @@
 # Attention Map Visualization
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18304024.svg)](https://doi.org/10.5281/zenodo.18304024)
+
 [![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/We-Want-GPU/diffusers-cross-attention-map-SDXL-t2i)
 
 Thanks to HuggingFace [Diffusers](https://github.com/huggingface/diffusers) team for the GPU sponsorship!
