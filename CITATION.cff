@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+title: "Attention Map Visualization"
+message: "If you find this software useful, please cite it as below."
+type: software
+authors:
+  - family-names: "Baek"
+    given-names: "Wooyeol"
+repository-code: "https://github.com/wooyeolbaek/attention-map-diffusers"
+license: MIT
+version: 1.0.0
+date-released: 2023-12-23

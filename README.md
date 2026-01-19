@@ -1,4 +1,4 @@
-# Cross Attention Map Visualization
+# Attention Map Visualization
 
 [![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/We-Want-GPU/diffusers-cross-attention-map-SDXL-t2i)
 
@@ -360,4 +360,18 @@ for batch, image in enumerate(images):
 save_attention_maps(attn_maps, pipe.tokenizer, prompts, base_dir='attn_maps', unconditional=True)
 #############################################
 
+```
+
+# Citation
+If you find this code useful in your research, please consider citing:
+
+```
+@misc{baek2024attentionmap,
+  author = {Wooyeol Baek},
+  title = {Attention Map Visualization},
+  year = {2023},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  howpublished = {\url{[https://github.com/wooyeolbaek/attention-map-diffusers](https://github.com/wooyeolbaek/attention-map-diffusers)}},
+}
 ```
