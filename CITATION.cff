@@ -7,5 +7,5 @@ authors:
     given-names: "Wooyeol"
 repository-code: "https://github.com/wooyeolbaek/attention-map-diffusers"
 license: MIT
-version: 1.0.0
-date-released: 2023-12-23
+version: 0.1.5
+date-released: 2026-01-20
