@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-title: "Attention Map Visualization"
+title: "attention-map-diffusers"
 message: "If you find this software useful, please cite it as below."
 type: software
 authors:
