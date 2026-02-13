@@ -54,20 +54,41 @@ def register_cross_attention_hook(model, hook_function, target_name):
     return model
 
 
+def _safe_set_forward(module, new_forward, module_class):
+    """
+    Replace a module's forward method while preserving any accelerate
+    CPU-offload hook that may already wrap it.
+
+    accelerate's ``add_hook_to_module`` stores the *original* forward in
+    ``module._old_forward`` and replaces ``module.forward`` with a wrapper
+    that calls ``pre_forward`` (moves params to GPU) → ``_old_forward`` →
+    ``post_forward`` (moves params back to CPU).
+
+    If we blindly overwrite ``.forward`` we destroy that wrapper and the
+    model never gets moved to GPU, causing device-mismatch errors.
+    """
+    bound = new_forward.__get__(module, module_class)
+    if hasattr(module, '_hf_hook') and hasattr(module, '_old_forward'):
+        # Accelerate hook is active – swap the *inner* forward it calls.
+        module._old_forward = bound
+    else:
+        module.forward = bound
+
+
 def replace_call_method_for_unet(model):
     if model.__class__.__name__ == 'UNet2DConditionModel':
         from diffusers.models.unets import UNet2DConditionModel
-        model.forward = UNet2DConditionModelForward.__get__(model, UNet2DConditionModel)
+        _safe_set_forward(model, UNet2DConditionModelForward, UNet2DConditionModel)
 
     for name, layer in model.named_children():
         
         if layer.__class__.__name__ == 'Transformer2DModel':
             from diffusers.models import Transformer2DModel
-            layer.forward = Transformer2DModelForward.__get__(layer, Transformer2DModel)
+            _safe_set_forward(layer, Transformer2DModelForward, Transformer2DModel)
         
         elif layer.__class__.__name__ == 'BasicTransformerBlock':
             from diffusers.models.attention import BasicTransformerBlock
-            layer.forward = BasicTransformerBlockForward.__get__(layer, BasicTransformerBlock)
+            _safe_set_forward(layer, BasicTransformerBlockForward, BasicTransformerBlock)
         
         replace_call_method_for_unet(layer)
     
@@ -78,13 +99,13 @@ def replace_call_method_for_unet(model):
 # def replace_call_method_for_sana(model):
 #     if model.__class__.__name__ == 'SanaTransformer2DModel':
 #         from diffusers.models.transformers import SanaTransformer2DModel
-#         model.forward = SanaTransformer2DModelForward.__get__(model, SanaTransformer2DModel)
+#         _safe_set_forward(model, SanaTransformer2DModelForward, SanaTransformer2DModel)
 
 #     for name, layer in model.named_children():
         
 #         if layer.__class__.__name__ == 'SanaTransformerBlock':
 #             from diffusers.models.transformers.sana_transformer import SanaTransformerBlock
-#             layer.forward = SanaTransformerBlockForward.__get__(layer, SanaTransformerBlock)
+#             _safe_set_forward(layer, SanaTransformerBlockForward, SanaTransformerBlock)
         
 #         replace_call_method_for_sana(layer)
     
@@ -94,13 +115,13 @@ def replace_call_method_for_unet(model):
 def replace_call_method_for_sd3(model):
     if model.__class__.__name__ == 'SD3Transformer2DModel':
         from diffusers.models.transformers import SD3Transformer2DModel
-        model.forward = SD3Transformer2DModelForward.__get__(model, SD3Transformer2DModel)
+        _safe_set_forward(model, SD3Transformer2DModelForward, SD3Transformer2DModel)
 
     for name, layer in model.named_children():
         
         if layer.__class__.__name__ == 'JointTransformerBlock':
             from diffusers.models.attention import JointTransformerBlock
-            layer.forward = JointTransformerBlockForward.__get__(layer, JointTransformerBlock)
+            _safe_set_forward(layer, JointTransformerBlockForward, JointTransformerBlock)
         
         replace_call_method_for_sd3(layer)
     
@@ -110,13 +131,13 @@ def replace_call_method_for_sd3(model):
 def replace_call_method_for_flux(model):
     if model.__class__.__name__ == 'FluxTransformer2DModel':
         from diffusers.models.transformers import FluxTransformer2DModel
-        model.forward = FluxTransformer2DModelForward.__get__(model, FluxTransformer2DModel)
+        _safe_set_forward(model, FluxTransformer2DModelForward, FluxTransformer2DModel)
 
     for name, layer in model.named_children():
         
         if layer.__class__.__name__ == 'FluxTransformerBlock':
             from diffusers.models.transformers.transformer_flux import FluxTransformerBlock
-            layer.forward = FluxTransformerBlockForward.__get__(layer, FluxTransformerBlock)
+            _safe_set_forward(layer, FluxTransformerBlockForward, FluxTransformerBlock)
         
         replace_call_method_for_flux(layer)
     
