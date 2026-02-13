@@ -130,12 +130,15 @@ def init_pipeline(pipeline):
     LoRAAttnProcessor2_0.__call__ = lora_attn_call2_0
 
     def _align_param_bias_dtype(module):
-        # Ensure weight and bias dtypes match (important for CPU offload + mixed precision).
+        # Force all weights & biases in hooked modules to float32 so there are
+        # no half/float mismatches when running with CPU offload.
         for m in module.modules():
             weight = getattr(m, "weight", None)
             bias = getattr(m, "bias", None)
-            if weight is not None and bias is not None and bias.dtype != weight.dtype:
-                m.bias = torch.nn.Parameter(bias.to(weight.dtype))
+            if weight is not None and weight.dtype != torch.float32:
+                m.weight = torch.nn.Parameter(weight.to(torch.float32))
+            if bias is not None and bias.dtype != torch.float32:
+                m.bias = torch.nn.Parameter(bias.to(torch.float32))
 
     if 'transformer' in vars(pipeline).keys():
         if pipeline.transformer.__class__.__name__ == 'SD3Transformer2DModel':
