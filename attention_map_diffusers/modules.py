@@ -920,15 +920,7 @@ def SD3Transformer2DModelForward(
 
     height, width = hidden_states.shape[-2:]
 
-    # Ensure positional embedding module matches `hidden_states` dtype & device.
-    # This avoids CPU offload issues like:
-    # "Input type (torch.cuda.FloatTensor) and weight type (torch.FloatTensor) should be the same"
-    # and half/float mismatches when the latents are different from embedding weights.
-    pos_module = getattr(self, "pos_embed", None)
-    if pos_module is not None:
-        pos_module = getattr(pos_module, "proj", pos_module)
-        pos_module.to(device=hidden_states.device, dtype=hidden_states.dtype)
-
+    # Original behavior: just apply positional embeddings.
     hidden_states = self.pos_embed(hidden_states)  # takes care of adding positional embeddings too.
     temb = self.time_text_embed(timestep, pooled_projections)
     encoder_hidden_states = self.context_embedder(encoder_hidden_states)
@@ -1080,14 +1072,6 @@ def FluxTransformer2DModelForward(
         img_ids = img_ids[0]
 
     ids = torch.cat((txt_ids, img_ids), dim=0)
-
-    # Ensure positional embedding module matches `ids` dtype & device to avoid half/float
-    # and CPU/GPU mismatches when using CPU offload with mixed dtypes.
-    pos_module = getattr(self, "pos_embed", None)
-    if pos_module is not None:
-        pos_module = getattr(pos_module, "proj", pos_module)
-        pos_module.to(device=ids.device, dtype=ids.dtype)
-
     image_rotary_emb = self.pos_embed(ids)
 
     for index_block, block in enumerate(self.transformer_blocks):
@@ -1497,13 +1481,6 @@ def BasicTransformerBlockForward(
         raise ValueError("Incorrect norm used")
 
     if self.pos_embed is not None:
-        # Match dtype & device of positional embedding module with `norm_hidden_states`
-        # to avoid mixed precision and CPU/GPU mismatches under CPU offload.
-        pos_module = getattr(self, "pos_embed", None)
-        if pos_module is not None:
-            pos_module = getattr(pos_module, "proj", pos_module)
-            pos_module.to(device=norm_hidden_states.device, dtype=norm_hidden_states.dtype)
-
         norm_hidden_states = self.pos_embed(norm_hidden_states)
 
     # 1. Prepare GLIGEN inputs
@@ -1551,12 +1528,6 @@ def BasicTransformerBlockForward(
             raise ValueError("Incorrect norm")
 
         if self.pos_embed is not None and self.norm_type != "ada_norm_single":
-            # Same dtype & device alignment as above for the second attention block.
-            pos_module = getattr(self, "pos_embed", None)
-            if pos_module is not None:
-                pos_module = getattr(pos_module, "proj", pos_module)
-                pos_module.to(device=norm_hidden_states.device, dtype=norm_hidden_states.dtype)
-
             norm_hidden_states = self.pos_embed(norm_hidden_states)
 
         attn_output = self.attn2(
