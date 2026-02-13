@@ -48,6 +48,19 @@ logger = logging.get_logger(__name__)
 attn_maps = {}
 
 
+def _align_module_dtype(module):
+    """
+    Runtime helper: align every bias to its weight's dtype **in-place**.
+    Called at the top of custom forwards so that any dtype mismatches
+    introduced by accelerate's CPU-offload reload are fixed before compute.
+    """
+    for m in module.modules():
+        w = getattr(m, "weight", None)
+        b = getattr(m, "bias", None)
+        if w is not None and b is not None and b.dtype != w.dtype:
+            m.bias.data = b.data.to(w.dtype)
+
+
 # TODO: implement
 # @torch.no_grad()
 # @replace_example_docstring(EXAMPLE_DOC_STRING)
@@ -643,6 +656,10 @@ def UNet2DConditionModelForward(
             If `return_dict` is True, an [`~models.unets.unet_2d_condition.UNet2DConditionOutput`] is returned,
             otherwise a `tuple` is returned where the first element is the sample tensor.
     """
+    # Fix any weight/bias dtype mismatches that CPU-offload may (re-)introduce
+    # each time modules are moved back from CPU.
+    _align_module_dtype(self)
+
     # By default samples have to be AT least a multiple of the overall upsampling factor.
     # The overall upsampling factor is equal to 2 ** (# num of upsampling layers).
     # However, the upsampling interpolation output size can be forced to fit any upsampling size
@@ -920,7 +937,10 @@ def SD3Transformer2DModelForward(
 
     height, width = hidden_states.shape[-2:]
 
-    # Original behavior: just apply positional embeddings.
+    # Fix any weight/bias dtype mismatches that CPU-offload may (re-)introduce
+    # each time modules are moved back from CPU.
+    _align_module_dtype(self)
+
     hidden_states = self.pos_embed(hidden_states)  # takes care of adding positional embeddings too.
     temb = self.time_text_embed(timestep, pooled_projections)
     encoder_hidden_states = self.context_embedder(encoder_hidden_states)
@@ -1044,6 +1064,11 @@ def FluxTransformer2DModelForward(
             logger.warning(
                 "Passing `scale` via `joint_attention_kwargs` when not using the PEFT backend is ineffective."
             )
+
+    # Fix any weight/bias dtype mismatches that CPU-offload may (re-)introduce
+    # each time modules are moved back from CPU.
+    _align_module_dtype(self)
+
     hidden_states = self.x_embedder(hidden_states)
 
     timestep = timestep.to(hidden_states.dtype) * 1000

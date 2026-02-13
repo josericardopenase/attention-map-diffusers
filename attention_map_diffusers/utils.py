@@ -129,35 +129,24 @@ def init_pipeline(pipeline):
     LoRAAttnProcessor.__call__ = lora_attn_call
     LoRAAttnProcessor2_0.__call__ = lora_attn_call2_0
 
-    def _align_param_bias_dtype(module, target_dtype):
+    def _align_param_bias_dtype(module):
         """
-        Ensure weight and bias dtypes match the module's compute dtype
-        (e.g. fp16 for SD3 on GPU) to avoid half/float mismatches under
-        CPU offload.
+        Ensure every module's bias has the same dtype as its weight.
+        Uses in-place .data replacement so that the original nn.Parameter
+        objects (tracked by accelerate's CPU-offload hooks) are preserved.
         """
-        if target_dtype is None:
-            return
-
         for m in module.modules():
             weight = getattr(m, "weight", None)
             bias = getattr(m, "bias", None)
-            if weight is not None and weight.dtype != target_dtype:
-                m.weight = torch.nn.Parameter(weight.to(target_dtype))
-            if bias is not None and bias.dtype != target_dtype:
-                m.bias = torch.nn.Parameter(bias.to(target_dtype))
+            if weight is not None and bias is not None and bias.dtype != weight.dtype:
+                m.bias.data = bias.data.to(weight.dtype)
 
     if 'transformer' in vars(pipeline).keys():
         if pipeline.transformer.__class__.__name__ == 'SD3Transformer2DModel':
             JointAttnProcessor2_0.__call__ = joint_attn_call2_0
             pipeline.transformer = register_cross_attention_hook(pipeline.transformer, hook_function, 'attn')
             pipeline.transformer = replace_call_method_for_sd3(pipeline.transformer)
-            target_dtype = getattr(pipeline.transformer, "dtype", None)
-            if target_dtype is None:
-                try:
-                    target_dtype = next(pipeline.transformer.parameters()).dtype
-                except StopIteration:
-                    target_dtype = None
-            _align_param_bias_dtype(pipeline.transformer, target_dtype)
+            _align_param_bias_dtype(pipeline.transformer)
         
         elif pipeline.transformer.__class__.__name__ == 'FluxTransformer2DModel':
             from diffusers import FluxPipeline
@@ -165,13 +154,7 @@ def init_pipeline(pipeline):
             FluxPipeline.__call__ = FluxPipeline_call
             pipeline.transformer = register_cross_attention_hook(pipeline.transformer, hook_function, 'attn')
             pipeline.transformer = replace_call_method_for_flux(pipeline.transformer)
-            target_dtype = getattr(pipeline.transformer, "dtype", None)
-            if target_dtype is None:
-                try:
-                    target_dtype = next(pipeline.transformer.parameters()).dtype
-                except StopIteration:
-                    target_dtype = None
-            _align_param_bias_dtype(pipeline.transformer, target_dtype)
+            _align_param_bias_dtype(pipeline.transformer)
 
         # TODO: implement
         # elif pipeline.transformer.__class__.__name__ == 'SanaTransformer2DModel':
@@ -184,13 +167,7 @@ def init_pipeline(pipeline):
         if pipeline.unet.__class__.__name__ == 'UNet2DConditionModel':
             pipeline.unet = register_cross_attention_hook(pipeline.unet, hook_function, 'attn2')
             pipeline.unet = replace_call_method_for_unet(pipeline.unet)
-            target_dtype = getattr(pipeline.unet, "dtype", None)
-            if target_dtype is None:
-                try:
-                    target_dtype = next(pipeline.unet.parameters()).dtype
-                except StopIteration:
-                    target_dtype = None
-            _align_param_bias_dtype(pipeline.unet, target_dtype)
+            _align_param_bias_dtype(pipeline.unet)
 
 
     return pipeline
